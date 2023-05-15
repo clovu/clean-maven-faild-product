@@ -1,7 +1,7 @@
 use std::{fs, io};
 use walkdir::WalkDir;
 fn main() -> io::Result<()> {
-    println!("开源地址：");
+    println!("开源地址：https://github.com/Clover-You/clear-maven-faild-product");
     println!("请输入 maven 仓库路径, 例如: C:/user/.m2/repository");
 
     let mut target_path = String::new();
