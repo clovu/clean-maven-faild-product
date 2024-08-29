@@ -19,5 +19,20 @@ jobs:
         fetch-depth: 0
     - name: Build
       run: cargo build --release --verbose
+      
     - name: Run tests
       run: cargo test --verbose
+
+    - name: Archive binaries
+      run: |
+        mkdir -p release
+        cp target/release/clear-maven-faild-product release/
+        tar -czvf release/clear-maven-faild-product.tar.gz -C release clear-maven-faild-product
+
+    - name: Create GitHub Release
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: release/clear-maven-faild-product.tar.gz
+        token: ${{ secrets.GITHUB_TOKEN }}
+        name: ${{ github.ref_name }} # 使用标签名称作为发布名称
+        tag: ${{ github.ref_name }} # 使用触发工作流的标签作为发布的标签
