@@ -1,0 +1,66 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest] # 定义操作系统矩阵
+        arch: [x86_64, aarch64] # 定义架构矩阵
+        
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build
+      run: cargo build --verbose
+    - name: Run tests
+      run: cargo test --verbose
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1 # 设置Rust工具链
+      with:
+        toolchain: stable # 使用稳定版Rust工具链
+        profile: minimal # 使用最小化配置文件
+        override: true # 覆盖任何现有的Rust工具链设置
+
+    # 上传macOS x86_64平台的构建产物
+    - name: Upload artifact (macOS)
+      if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
+      uses: actions/upload-artifact@v2
+      with:
+        name: macos-latest-clean-maven-faild-product
+        path: target/release/clean-maven-faild-product
+        
+  release:
+    runs-on: ubuntu-latest # 定义作业运行在Ubuntu系统上
+    needs: build # 依赖于build作业
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2 # 检出仓库代码
+
+      # 下载macOS x86_64平台的构建产物
+      - name: Download artifact (macOS-x86_64)
+        uses: actions/download-artifact@v2
+        with:
+          name: macos-latest-clean-maven-faild-product
+          path: artifacts/macos
+          
+      # 上传macOS x86_64平台的构建产物到发布页面
+      - name: Upload macOS x86_64 artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }} # 使用GitHub令牌进行身份验证
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # 使用创建发布步骤生成的上传URL
+          asset_path: artifacts/macos/clean-maven-faild-product # 上传的文件路径
+          asset_name: clean-maven-faild-product-macos-x86_64 # 上传的文件名
+          asset_content_type: application/octet-stream # 文件内容类型
