@@ -1,16 +1,26 @@
 use std::{fs, io};
 use walkdir::WalkDir;
 fn main() -> io::Result<()> {
-    println!("开源地址：https://github.com/Clover-You/clean-maven-faild-product");
-    println!("请输入 maven 仓库路径, 例如: C:/user/.m2/repository");
+    println!("the project is open-sourced on GitHub: https://github.com/Clover-You/clean-maven-faild-product");
+    println!("please enter the path to the Maven repository, e.g.: C:/user/.m2/repository");
 
-    let mut target_path = String::new();
+    let mut target_path: String;
 
-    io::stdin()
-        .read_line(&mut target_path)
-        .expect("field to read line");
-    target_path = String::from(target_path.trim());
-    fs::read_dir(&target_path).expect("目录不存在");
+    loop {
+        target_path = String::from("");
+
+        io::stdin()
+            .read_line(&mut target_path)
+            .expect("field to read line");
+        target_path = String::from(target_path.trim());
+        
+        match fs::read_dir(&target_path) {
+            Err(err) => {
+                println!("{}, please re-enter:", err);
+            }
+            Ok(_) => break,
+        }
+    }
 
     let dirs = WalkDir::new(target_path).into_iter().filter_map(Result::ok);
     let mut faild_pack_path: Vec<String> = Vec::new();
@@ -40,8 +50,7 @@ fn main() -> io::Result<()> {
         fs::remove_dir_all(folder)?;
     }
 
-    println!();
-    println!("successful count {} !", faild_pack_path.len());
+    println!("\n\nsuccessful count {} !", faild_pack_path.len());
 
     Ok(())
 }
