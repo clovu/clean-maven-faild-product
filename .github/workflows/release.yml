@@ -1,221 +1,212 @@
-name: Release
-on:
-  # schedule:
-  # - cron: '0 0 * * *' # midnight UTC
+# GitHub Actions工作流配置文件
 
-  push:
-    tags:
-    - 'v[0-9]+.[0-9]+.[0-9]+'
-    ## - release
+name: Build and Release
+
+# on:
+#   push:
+#     tags:
+#       - "v*.*.*" # 当推送符合模式v*.*.*的标签时触发工作流
 
 env:
-  BIN_NAME: bfoot
-  PROJECT_NAME: clean-maven
-  REPO_NAME: spectralops/rust-ci-release-template
-  BREW_TAP: jondot/homebrew-tap
+  BIN_NAME: clean-maven-faild-product
 
 jobs:
-  dist:
-    name: Dist
-    runs-on: ${{ matrix.os }}
+  build:
+    runs-on: ${{ matrix.os }} # 定义作业运行的操作系统
     strategy:
-      fail-fast: false # don't fail other jobs if one fails
       matrix:
-        build: [x86_64-linux, aarch64-linux, x86_64-macos, x86_64-windows] #, x86_64-win-gnu, win32-msvc
-        include:
-        - build: x86_64-linux
-          os: ubuntu-20.04
-          rust: stable
-          target: x86_64-unknown-linux-gnu
-          cross: false
-        - build: aarch64-linux
-          os: ubuntu-20.04
-          rust: stable
-          target: aarch64-unknown-linux-gnu
-          cross: true
-        - build: x86_64-macos
-          os: macos-latest
-          rust: stable
-          target: x86_64-apple-darwin
-          cross: false
-        - build: x86_64-windows
-          os: windows-2019
-          rust: stable
-          target: x86_64-pc-windows-msvc
-          cross: false
-        # - build: aarch64-macos
-        #   os: macos-latest
-        #   rust: stable
-        #   target: aarch64-apple-darwin
-        # - build: x86_64-win-gnu
-        #   os: windows-2019
-        #   rust: stable-x86_64-gnu
-        #   target: x86_64-pc-windows-gnu
-        # - build: win32-msvc
-        #   os: windows-2019
-        #   rust: stable
-        #   target: i686-pc-windows-msvc
+        os: [ubuntu-latest, macos-latest, windows-latest] # 定义操作系统矩阵
+        arch: [x86_64, aarch64] # 定义架构矩阵
 
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2 # 检出仓库代码
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1 # 设置Rust工具链
         with:
-          submodules: true
+          toolchain: stable # 使用稳定版Rust工具链
+          profile: minimal # 使用最小化配置文件
+          override: true # 覆盖任何现有的Rust工具链设置
 
-      - name: Install ${{ matrix.rust }} toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Build project
+        run: cargo build --release # 构建项目的发布版本
+
+      # 上传Linux x86_64平台的构建产物
+      - name: Upload artifact (Linux)
+        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x86_64'
+        uses: actions/upload-artifact@v2
         with:
-          profile: minimal
-          toolchain: ${{ matrix.rust }}
-          target: ${{ matrix.target }}
-          override: true
+          name: ubuntu-latest-$BIN_NAME
+          path: target/release/$BIN_NAME
 
-      - name: Run cargo test
-        uses: actions-rs/cargo@v1
+      # 上传Linux aarch64平台的构建产物
+      - name: Upload artifact (Linux aarch64)
+        if: matrix.os == 'ubuntu-latest' && matrix.arch == 'aarch64'
+        uses: actions/upload-artifact@v2
         with:
-          use-cross: ${{ matrix.cross }}
-          command: test
-          args: --release --locked --target ${{ matrix.target }}
+          name: ubuntu-latest-$BIN_NAME-aarch64
+          path: target/release/$BIN_NAME
 
-      - name: Build release binary
-        uses: actions-rs/cargo@v1
+      # 上传macOS x86_64平台的构建产物
+      - name: Upload artifact (macOS)
+        if: matrix.os == 'macos-latest' && matrix.arch == 'x86_64'
+        uses: actions/upload-artifact@v2
         with:
-          use-cross: ${{ matrix.cross }}
-          command: build
-          args: --release --locked --target ${{ matrix.target }}
+          name: macos-latest-$BIN_NAME
+          path: target/release/$BIN_NAME
 
-      - name: Strip release binary (linux and macos)
-        if: matrix.build == 'x86_64-linux' || matrix.build == 'x86_64-macos'
-        run: strip "target/${{ matrix.target }}/release/$BIN_NAME"
-
-      - name: Strip release binary (arm)
-        if: matrix.build == 'aarch64-linux'
-        run: |
-          docker run --rm -v \
-            "$PWD/target:/target:Z" \
-            rustembedded/cross:${{ matrix.target }} \
-            aarch64-linux-gnu-strip \
-            /target/${{ matrix.target }}/release/$BIN_NAME
-
-      - name: Build archive
-        shell: bash
-        run: |
-          mkdir dist
-          if [ "${{ matrix.os }}" = "windows-2019" ]; then
-            cp "target/${{ matrix.target }}/release/$BIN_NAME.exe" "dist/"
-          else
-            cp "target/${{ matrix.target }}/release/$BIN_NAME" "dist/"
-          fi
-
-      - uses: actions/upload-artifact@v2.2.4
+      # 上传macOS aarch64平台的构建产物
+      - name: Upload artifact (macOS aarch64)
+        if: matrix.os == 'macos-latest' && matrix.arch == 'aarch64'
+        uses: actions/upload-artifact@v2
         with:
-          name: bins-${{ matrix.build }}
-          path: dist
+          name: macos-latest-$BIN_NAME-aarch64
+          path: target/release/$BIN_NAME
 
-  publish:
-    name: Publish
-    needs: [dist]
-    runs-on: ubuntu-latest
+      # 上传Windows x86_64平台的构建产物
+      - name: Upload artifact (Windows)
+        if: matrix.os == 'windows-latest' && matrix.arch == 'x86_64'
+        uses: actions/upload-artifact@v2
+        with:
+          name: windows-latest-$BIN_NAME
+          path: target/release/$BIN_NAME.exe
+
+      # 上传Windows aarch64平台的构建产物
+      - name: Upload artifact (Windows aarch64)
+        if: matrix.os == 'windows-latest' && matrix.arch == 'aarch64'
+        uses: actions/upload-artifact@v2
+        with:
+          name: windows-latest-$BIN_NAME-aarch64
+          path: target/release/$BIN_NAME.exe
+
+  release:
+    runs-on: ubuntu-latest # 定义作业运行在Ubuntu系统上
+    needs: build # 依赖于build作业
+
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2 # 检出仓库代码
+
+      # 下载Linux x86_64平台的构建产物
+      - name: Download artifact (Linux-x86_64)
+        uses: actions/download-artifact@v2
         with:
-          submodules: false
+          name: ubuntu-latest-$BIN_NAME
+          path: artifacts/ubuntu
 
-      - uses: actions/download-artifact@v2
-        # with:
-        #   path: dist
-      # - run: ls -al ./dist
-      - run: ls -al bins-*
-
-      - name: Calculate tag name
-        run: |
-          name=dev
-          if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            name=${GITHUB_REF:10}
-          fi
-          echo ::set-output name=val::$name
-          echo TAG=$name >> $GITHUB_ENV
-        id: tagname
-
-      - name: Build archive
-        shell: bash
-        run: |
-          set -ex
-
-          rm -rf tmp
-          mkdir tmp
-          mkdir dist
-
-          for dir in bins-* ; do
-              platform=${dir#"bins-"}
-              unset exe
-              if [[ $platform =~ "windows" ]]; then
-                  exe=".exe"
-              fi
-              pkgname=$PROJECT_NAME-$TAG-$platform
-              mkdir tmp/$pkgname
-              # cp LICENSE README.md tmp/$pkgname
-              mv bins-$platform/$BIN_NAME$exe tmp/$pkgname
-              chmod +x tmp/$pkgname/$BIN_NAME$exe
-
-              if [ "$exe" = "" ]; then
-                  tar cJf dist/$pkgname.tar.xz -C tmp $pkgname
-              else
-                  (cd tmp && 7z a -r ../dist/$pkgname.zip $pkgname)
-              fi
-          done
-
-      - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v2
+      # 下载macOS x86_64平台的构建产物
+      - name: Download artifact (macOS-x86_64)
+        uses: actions/download-artifact@v2
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: dist/*
-          file_glob: true
-          tag: ${{ steps.tagname.outputs.val }}
-          overwrite: true
+          name: macos-latest-$BIN_NAME
+          path: artifacts/macos
 
-      - name: Extract version
-        id: extract-version
-        run: |
-          printf "::set-output name=%s::%s\n" tag-name "${GITHUB_REF#refs/tags/}"
-
-      - uses: mislav/bump-homebrew-formula-action@v1
+      # 下载Windows x86_64平台的构建产物
+      - name: Download artifact (Windows-x86_64)
+        uses: actions/download-artifact@v2
         with:
-          formula-path: ${{env.PROJECT_NAME}}.rb
-          homebrew-tap: ${{ env.BREW_TAP }}
-          download-url: "https://github.com/${{ env.REPO_NAME }}/releases/download/${{ steps.extract-version.outputs.tag-name }}/${{env.PROJECT_NAME}}-${{ steps.extract-version.outputs.tag-name }}-x86_64-macos.tar.xz"
-          commit-message: updating formula for ${{ env.PROJECT_NAME }}
+          name: windows-latest-$BIN_NAME
+          path: artifacts/windows
+
+      # 下载Linux aarch64平台的构建产物
+      - name: Download artifact (Linux-aarch64)
+        uses: actions/download-artifact@v2
+        with:
+          name: ubuntu-latest-$BIN_NAME-aarch64
+          path: artifacts/ubuntu
+
+      # 下载macOS aarch64平台的构建产物
+      - name: Download artifact (macOS-aarch64)
+        uses: actions/download-artifact@v2
+        with:
+          name: macos-latest-$BIN_NAME-aarch64
+          path: artifacts/macos
+
+      # 下载Windows aarch64平台的构建产物
+      - name: Download artifact (Windows-aarch64)
+        uses: actions/download-artifact@v2
+        with:
+          name: windows-latest-$BIN_NAME-aarch64
+          path: artifacts/windows
+
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1 # 创建GitHub release
         env:
-          COMMITTER_TOKEN: ${{ secrets.COMMITTER_TOKEN }}
-        #
-        # you can use this initial file in your homebrew-tap if you don't have an initial formula:
-        # <projectname>.rb
-        #
-        # class <Projectname capitalized> < Formula
-        #   desc "A test formula"
-        #   homepage "http://www.example.com"
-        #   url "-----"
-        #   version "-----"
-        #   sha256 "-----"
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }} # 使用GitHub令牌进行身份验证
+        with:
+          tag_name: ${{ github.ref }} # 使用推送的标签名
+          release_name: Release ${{ github.ref }} # 使用推送的标签名作为发布名称
+          body: |
+            Changes in this Release
+            - First Change
+            - Second Change # 发布说明
+          draft: false # 是否为草稿
+          prerelease: false # 是否为预发布
 
-        #   def install
-        #     bin.install "<bin-name>"
-        #   end
-        # end
+      # 上传Linux x86_64平台的构建产物到发布页面
+      - name: Upload Linux x86_64 artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }} # 使用GitHub令牌进行身份验证
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # 使用创建发布步骤生成的上传URL
+          asset_path: artifacts/ubuntu/$BIN_NAME # 上传的文件路径
+          asset_name: $BIN_NAME-linux-x86_64 # 上传的文件名
+          asset_content_type: application/octet-stream # 文件内容类型
 
-      
-      # Uncomment this section if you want to release your package to crates.io
-      # Before publishing, make sure you have filled out the following fields:
-      # license or license-file, description, homepage, documentation, repository, readme.
-      # Read more: https://doc.rust-lang.org/cargo/reference/publishing.html
+      # 上传macOS x86_64平台的构建产物到发布页面
+      - name: Upload macOS x86_64 artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }} # 使用GitHub令牌进行身份验证
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # 使用创建发布步骤生成的上传URL
+          asset_path: artifacts/macos/$BIN_NAME # 上传的文件路径
+          asset_name: $BIN_NAME-macos-x86_64 # 上传的文件名
+          asset_content_type: application/octet-stream # 文件内容类型
 
-      # - name: Install ${{ matrix.rust }} toolchain
-      #   uses: actions-rs/toolchain@v1
-      #   with:
-      #     profile: minimal
-      #     toolchain: ${{ matrix.rust }}
-      #     target: ${{ matrix.target }}
-      # - run: cargo publish --token ${CRATES_TOKEN}
-      #  env:
-      #    CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
+      # 上传Windows x86_64平台的构建产物到发布页面
+      - name: Upload Windows x86_64 artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }} # 使用GitHub令牌进行身份验证
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # 使用创建发布步骤生成的上传URL
+          asset_path: artifacts/windows/$BIN_NAME.exe # 上传的文件路径
+          asset_name: $BIN_NAME-windows-x86_64.exe # 上传的文件名
+          asset_content_type: application/octet-stream # 文件内容类型
+
+      # 上传Linux aarch64平台的构建产物到发布页面
+      - name: Upload Linux aarch64 artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }} # 使用GitHub令牌进行身份验证
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # 使用创建发布步骤生成的上传URL
+          asset_path: artifacts/ubuntu/$BIN_NAME # 上传的文件路径
+          asset_name: $BIN_NAME-linux-aarch64 # 上传的文件名
+          asset_content_type: application/octet-stream # 文件内容类型
+
+      # 上传macOS aarch64平台的构建产物到发布页面
+      - name: Upload macOS aarch64 artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }} # 使用GitHub令牌进行身份验证
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # 使用创建发布步骤生成的上传URL
+          asset_path: artifacts/macos/$BIN_NAME # 上传的文件路径
+          asset_name: $BIN_NAME-macos-aarch64 # 上传的文件名
+          asset_content_type: application/octet-stream # 文件内容类型
+
+      # 上传Windows aarch64平台的构建产物到发布页面
+      - name: Upload Windows aarch64 artifact
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }} # 使用GitHub令牌进行身份验证
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # 使用创建发布步骤生成的上传URL
+          asset_path: artifacts/windows/$BIN_NAME.exe # 上传的文件路径
+          asset_name: $BIN_NAME-windows-aarch64.exe # 上传的文件名
+          asset_content_type: application/octet-stream # 文件内容类型
