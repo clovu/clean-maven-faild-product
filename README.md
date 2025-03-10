@@ -45,4 +45,4 @@ The compiled executable will be generated in the `target/release` directory.
 
 ## License
 
-MIT License © 2025 [Clover You](https://github.com/Clover-You)
+MIT License © 2025 [Clover You](https://github.com/clovu)
