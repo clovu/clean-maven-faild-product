@@ -5,7 +5,7 @@ fn main() -> io::Result<()> {
   // before start, clear the console
   print!("\x1B[2J\x1B[1;1H");
 
-  println!("the project is open-sourced on GitHub: https://github.com/Clover-You/clean-maven-faild-product");
+  println!("the project is open-sourced on GitHub: https://github.com/clovu/clean-maven-faild-product");
   println!("please enter the path to the Maven repository, e.g.: C:/user/.m2/repository");
 
   let mut target_path: String;
